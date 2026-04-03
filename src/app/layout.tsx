@@ -1,6 +1,8 @@
-// BYYU AI — © Abiyyu Rafa Ramadhan
+// BYYU AI v2 — Layout
+// © Abiyyu Rafa Ramadhan
 import type { Metadata, Viewport } from 'next';
-import { Lora, Inter } from 'next/font/google';
+import { Lora, Inter }             from 'next/font/google';
+import 'katex/dist/katex.min.css';
 import './globals.css';
 
 const lora = Lora({
@@ -20,9 +22,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title:       'BYYU AI',
-  description: 'Asisten AI cerdas oleh Abiyyu Rafa Ramadhan',
+  description: 'Asisten AI canggih oleh Abiyyu Rafa Ramadhan — SMKN 1 Purwakarta',
   authors:     [{ name: 'Abiyyu Rafa Ramadhan' }],
   creator:     'Abiyyu Rafa Ramadhan',
+  keywords:    ['BYYU AI', 'Abiyyu Rafa Ramadhan', 'AI Assistant', 'SMKN 1 Purwakarta'],
 };
 
 export const viewport: Viewport = {
@@ -35,7 +38,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id" className={`${lora.variable} ${inter.variable}`} suppressHydrationWarning>
-      <body style={{ margin: 0, padding: 0, overflow: 'hidden', backgroundColor: '#f9f9f8' }}>
+      <head>
+        {/* Prevent dark mode flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var t = localStorage.getItem('byyu-theme');
+              if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+              document.documentElement.setAttribute('data-theme', t);
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
+      <body style={{ margin: 0, padding: 0, overflow: 'hidden' }}>
         {children}
       </body>
     </html>
