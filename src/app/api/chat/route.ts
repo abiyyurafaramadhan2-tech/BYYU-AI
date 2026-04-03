@@ -38,11 +38,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Batasi histori chat ke 20 pesan terakhir untuk efisiensi token
     const recentMessages = messages.slice(-20);
 
     const completion = await groq.chat.completions.create({
-      // FIXED: Menggunakan model Llama 3.1 terbaru yang didukung Groq
-      model:       'llama-3.1-70b-versatile', 
+      // FIXED: Menggunakan model Llama 3.1 8B yang aktif dan cepat
+      model:       'llama-3.1-8b-instant',
       messages:    [
         { role: 'system', content: SYSTEM_PROMPT },
         ...recentMessages,
