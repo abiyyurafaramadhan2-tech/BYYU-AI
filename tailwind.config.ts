@@ -2,7 +2,7 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: [
-    // FIXED: Jalur universal agar Tailwind mendeteksi semua komponen kamu
+    // Jalur universal: mencari di folder root DAN folder src
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/**/*.{js,ts,jsx,tsx,mdx}',
@@ -19,8 +19,8 @@ const config: Config = {
         'hover-bg':   '#eeebe6',
       },
       fontFamily: {
-        serif:  ['var(--font-serif)',  'Georgia',    'Cambria', 'serif'],
-        sans:   ['var(--font-sans)',   'system-ui',  'sans-serif'],
+        serif:  ['var(--font-serif)',  'Georgia', 'serif'],
+        sans:   ['var(--font-sans)',   'system-ui', 'sans-serif'],
       },
       maxWidth: {
         '3xl': '48rem',
@@ -31,18 +31,9 @@ const config: Config = {
         'pulse-dot':   'pulseDot 1.4s ease-in-out infinite',
       },
       keyframes: {
-        fadeIn: {
-          '0%':   { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        slideUp: {
-          '0%':   { opacity: '0', transform: 'translateY(8px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        pulseDot: {
-          '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: '0.4' },
-          '40%':           { transform: 'scale(1)',   opacity: '1'   },
-        },
+        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+        slideUp: { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        pulseDot: { '0%, 80%, 100%': { transform: 'scale(0.6)', opacity: '0.4' }, '40%': { transform: 'scale(1)', opacity: '1' } },
       },
     },
   },
