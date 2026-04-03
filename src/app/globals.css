@@ -672,8 +672,8 @@ body {
 }
 .modal-btn-accent:hover { background: rgba(201,123,75,0.85); }
 
-.modal-copy { text-align: center;
-             
+.modal-copy { text-align: center; font-size: 11px; color: var(--muted); margin-top: 16px; }
+
 /* ── Mobile sidebar overlay ─────────────────── */
 .sidebar-overlay {
   display: none;
@@ -714,5 +714,4 @@ body {
 @keyframes pulseDot {
   0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
   40%           { transform: scale(1);   opacity: 1; }
-    }
-             
+              }
