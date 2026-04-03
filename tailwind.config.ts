@@ -2,10 +2,12 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   content: [
+    // Jalur ini harus sesuai dengan folder src/app di repo kamu
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    // Jalur cadangan jika ada file di luar src
     './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/**/*.{js,ts,jsx,tsx,mdx}', // Mencakup folder src/app kamu
   ],
   theme: {
     extend: {
@@ -21,14 +23,6 @@ const config: Config = {
       fontFamily: {
         serif:  ['var(--font-serif)',  'Georgia', 'serif'],
         sans:   ['var(--font-sans)',   'system-ui', 'sans-serif'],
-      },
-      animation: {
-        'fade-in':  'fadeIn 0.3s ease-out',
-        'slide-up': 'slideUp 0.3s ease-out',
-      },
-      keyframes: {
-        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-        slideUp: { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
       },
     },
   },
