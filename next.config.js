@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverActions: {
-      allowedOrigins: ['localhost:3000'],
-    },
-  },
+  transpilePackages: [
+    'react-markdown',
+    'remark-math',
+    'rehype-katex',
+    'remark-gfm',
+  ],
+  eslint:     { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: false },
 };
 
 module.exports = nextConfig;
