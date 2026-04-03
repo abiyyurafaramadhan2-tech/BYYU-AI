@@ -672,7 +672,12 @@ body {
 }
 .modal-btn-accent:hover { background: rgba(201,123,75,0.85); }
 
-.modal-copy { text-align: center; font-size: 11px; color: var(--muted); margin-top: 16px; }
+.modal-copy { 
+  text-align: center; 
+  font-size: 11px; 
+  color: var(--muted); 
+  margin-top: 16px; 
+}
 
 /* ── Mobile sidebar overlay ─────────────────── */
 .sidebar-overlay {
