@@ -1,102 +1,259 @@
 'use client';
-// BYYU AI — © Abiyyu Rafa Ramadhan
+// BYYU AI v2 — Main UI
+// © Abiyyu Rafa Ramadhan
 
 import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  type KeyboardEvent,
-  type FormEvent,
+  useState, useRef, useEffect, useCallback,
+  createContext, useContext,
+  type KeyboardEvent, type FormEvent, type ReactNode,
 } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm     from 'remark-gfm';
+import remarkMath    from 'remark-math';
+import rehypeKatex   from 'rehype-katex';
 import {
-  Send, Plus, MessageSquare, User, X,
-  Sparkles, Github, Trash2, Menu, ChevronRight,
+  Send, Plus, MessageSquare, Trash2, Menu,
+  User, X, Github, Sparkles, ChevronRight,
+  Sun, Moon, Zap, Search, Copy, Check,
 } from 'lucide-react';
 
-// ── Types ──────────────────────────────────────────────────
-interface Message {
-  id:      string;
-  role:    'user' | 'assistant';
-  content: string;
-  ts:      number;
+// ══════════════════════════════════════════
+// TYPES
+// ══════════════════════════════════════════
+interface Msg {
+  id:       string;
+  role:     'user' | 'assistant';
+  content:  string;
+  ts:       number;
+  proMode?: boolean;
+  searched?: boolean;
 }
 
-interface Conversation {
+interface Conv {
   id:       string;
   title:    string;
-  messages: Message[];
+  messages: Msg[];
   ts:       number;
 }
 
-// ── Helpers ────────────────────────────────────────────────
+interface SearchResult {
+  title:   string;
+  snippet: string;
+  url:     string;
+  source:  string;
+}
+
+// ══════════════════════════════════════════
+// THEME CONTEXT
+// ══════════════════════════════════════════
+const ThemeCtx = createContext<{
+  theme:       'light' | 'dark';
+  toggleTheme: () => void;
+}>({ theme: 'light', toggleTheme: () => {} });
+
+function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    const saved  = localStorage.getItem('byyu-theme') as 'light' | 'dark' | null;
+    const prefer = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const init   = saved ?? prefer;
+    setTheme(init);
+    document.documentElement.setAttribute('data-theme', init);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('byyu-theme', next);
+      document.documentElement.setAttribute('data-theme', next);
+      return next;
+    });
+  }, []);
+
+  return <ThemeCtx.Provider value={{ theme, toggleTheme }}>{children}</ThemeCtx.Provider>;
+}
+
+// ══════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════
 const uid    = () => Math.random().toString(36).slice(2, 11);
 const trunc  = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + '…' : s;
 const fmtTime = (ts: number) =>
   new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(new Date(ts));
 
+const blockCopy = (e: React.ClipboardEvent) => { e.preventDefault(); e.stopPropagation(); };
+
 const STARTERS = [
   'Siapa yang membuatmu?',
-  'Jelaskan konsep React Hooks',
-  'Bantu saya debug kode TypeScript',
-  'Apa itu Large Language Model?',
+  'Selesaikan: $\\int_0^1 x^2\\,dx$',
+  'Debug kode JavaScript ini',
+  'Apa itu Machine Learning?',
 ];
 
-// ── Prevent copy util ──────────────────────────────────────
-function blockCopy(e: React.ClipboardEvent) {
-  e.preventDefault();
-  e.stopPropagation();
+// ══════════════════════════════════════════
+// CODE BLOCK (dengan copy button)
+// ══════════════════════════════════════════
+function CodeBlock({ language, code }: { language: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    }).catch(() => {});
+  };
+
+  return (
+    <div className="code-block" onCopy={e => e.stopPropagation()}>
+      <div className="code-head">
+        <span className="code-lang">{language || 'code'}</span>
+        <button className="copy-btn selectable" onClick={handleCopy}>
+          {copied
+            ? <><Check size={11} />Copied!</>
+            : <><Copy size={11} />Copy</>
+          }
+        </button>
+      </div>
+      <div className="code-body selectable">
+        <pre><code>{code}</code></pre>
+      </div>
+    </div>
+  );
 }
 
-// ── Loading Dots ───────────────────────────────────────────
-function LoadingDots() {
+// ══════════════════════════════════════════
+// AI CONTENT (Markdown + Math + Code)
+// ══════════════════════════════════════════
+type CodeComponentProps = {
+  inline?:    boolean;
+  className?: string;
+  children?:  React.ReactNode;
+};
+
+function AIContent({ content }: { content: string }) {
+  return (
+    <div className="ai-prose selectable">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          code({ inline, className, children }: CodeComponentProps) {
+            const lang = /language-(\w+)/.exec(className || '')?.[1] ?? '';
+            const code = String(children ?? '').replace(/\n$/, '');
+            if (!inline && code.includes('\n')) {
+              return <CodeBlock language={lang} code={code} />;
+            }
+            return <code className={className}>{children}</code>;
+          },
+          a({ href, children }) {
+            return (
+              <a href={href ?? '#'} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+// LOADING DOTS
+// ══════════════════════════════════════════
+function LoadingDots({ proMode, searching }: { proMode: boolean; searching: boolean }) {
+  const label = searching
+    ? '🔍 Mencari di web...'
+    : proMode
+    ? '🧠 Berpikir mendalam...'
+    : undefined;
+
   return (
     <div className="dots-row">
       <div className="dot" />
       <div className="dot" />
       <div className="dot" />
+      {label && <span className="thinking-label">{label}</span>}
     </div>
   );
 }
 
-// ── About Modal ────────────────────────────────────────────
+// ══════════════════════════════════════════
+// MESSAGE BLOCK
+// ══════════════════════════════════════════
+function MessageBlock({ msg }: { msg: Msg }) {
+  const isUser = msg.role === 'user';
+
+  if (isUser) {
+    return (
+      <div className="user-wrap" onCopy={blockCopy}>
+        <div className="user-inner">
+          <div className="user-bubble">
+            <p className="user-text selectable">{msg.content}</p>
+          </div>
+          <p className="msg-time">{fmtTime(msg.ts)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ai-wrap">
+      <div className="ai-avatar" onCopy={blockCopy}>B</div>
+      <div className="ai-body">
+        <div className="ai-name-row" onCopy={blockCopy}>
+          <span className="ai-name">BYYU AI</span>
+          <span className="ai-time">{fmtTime(msg.ts)}</span>
+          {msg.proMode   && <span className="ai-tag pro">⚡ Pro</span>}
+          {msg.searched  && <span className="ai-tag search">🔍 Web</span>}
+        </div>
+        <AIContent content={msg.content} />
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════
+// ABOUT MODAL
+// ══════════════════════════════════════════
 function AboutModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-overlay" onClick={onClose} onCopy={blockCopy}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <button className="modal-close" onClick={onClose} aria-label="Tutup">
-          <X size={18} />
+          <X size={17} />
         </button>
 
-        <div className="modal-avatar-wrap">
-          <div className="modal-avatar">👨‍💻</div>
-          <p className="modal-name">Abiyyu Rafa Ramadhan</p>
-          <p className="modal-role">Full-stack Developer</p>
-        </div>
+        <div className="modal-avatar">👨‍💻</div>
+        <h2>Abiyyu Rafa Ramadhan</h2>
+        <p className="modal-role">Full-stack Developer · Pelajar SMKN 1 Purwakarta</p>
 
         <p className="modal-bio">
-          Developer yang passionate dalam membangun produk digital berkualitas tinggi,
-          dari UI elegan hingga backend yang robust dan integrasi AI.
+          Pelajar muda berbakat dari jurusan Teknik Elektronika Industri, lahir 2008.
+          Memiliki passion besar dalam dunia teknologi—khususnya pengembangan web,
+          AI engineering, dan sistem digital inovatif.
         </p>
 
-        <div className="modal-info-box">
+        <div className="modal-info">
           {[
-            { label: 'Keahlian',     value: 'Next.js, React, Node.js, TypeScript' },
-            { label: 'Spesialisasi', value: 'Full-stack Web & AI Integration' },
-            { label: 'Proyek',       value: 'BYYU AI, QuizGenius, ElectroVerse' },
+            { l:'Sekolah',      v:'SMKN 1 Purwakarta — Teknik Elektronika Industri' },
+            { l:'Keahlian',     v:'Next.js, React, TypeScript, Node.js, AI/LLM' },
+            { l:'Proyek',       v:'BYYU AI, QuizGenius, ElectroVerse, ChubbyGenius' },
+            { l:'Cita-cita',    v:'Teknik Industri Universitas Indonesia' },
           ].map(item => (
-            <div key={item.label} className="modal-info-row">
-              <span className="modal-info-label">{item.label}</span>
-              <span className="modal-info-value">{item.value}</span>
+            <div key={item.l} className="info-row">
+              <span className="info-lbl">{item.l}</span>
+              <span className="info-val">{item.v}</span>
             </div>
           ))}
         </div>
 
-        <div className="skill-chips">
-          {['Next.js','React','TypeScript','Node.js','Tailwind','Prisma','AI/LLM','UI/UX'].map(s => (
-            <span key={s} className="skill-chip">{s}</span>
+        <div className="chips">
+          {['Next.js','React','TypeScript','Node.js','Tailwind','Prisma','PostgreSQL','AI/LLM','UI/UX','Railway'].map(s => (
+            <span key={s} className="chip">{s}</span>
           ))}
         </div>
 
@@ -105,252 +262,223 @@ function AboutModal({ onClose }: { onClose: () => void }) {
             href="https://github.com/abiyyurafa"
             target="_blank"
             rel="noopener noreferrer"
-            className="modal-btn-outline"
+            className="modal-btn outline"
           >
             <Github size={14} /> GitHub
           </a>
-          <button className="modal-btn-accent" onClick={onClose}>
+          <button className="modal-btn filled" onClick={onClose}>
             <Sparkles size={14} /> Kembali Chat
           </button>
         </div>
-
         <p className="modal-copy">© 2026 BYYU AI · Abiyyu Rafa Ramadhan</p>
       </div>
     </div>
   );
 }
 
-// ── Message Component ──────────────────────────────────────
-function MessageBlock({ message }: { message: Message }) {
-  const isUser = message.role === 'user';
+// ══════════════════════════════════════════
+// MAIN PAGE
+// ══════════════════════════════════════════
+function ChatPage() {
+  const { theme, toggleTheme } = useContext(ThemeCtx);
 
-  if (isUser) {
-    return (
-      /* User: hanya teks bisa diselect */
-      <div className="user-msg-wrap" onCopy={blockCopy}>
-        <div className="user-bubble">
-          <div className="user-bubble-inner">
-            {/* selectable: teks prompt bisa dikopi */}
-            <p className="user-text selectable">{message.content}</p>
-          </div>
-          <p className="msg-time">{fmtTime(message.ts)}</p>
-        </div>
-      </div>
-    );
-  }
+  const [convs,       setConvs]       = useState<Conv[]>([]);
+  const [activeId,    setActiveId]    = useState<string | null>(null);
+  const [input,       setInput]       = useState('');
+  const [loading,     setLoading]     = useState(false);
+  const [searching,   setSearching]   = useState(false);
+  const [proMode,     setProMode]     = useState(false);
+  const [searchMode,  setSearchMode]  = useState(false);
+  const [showAbout,   setShowAbout]   = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
 
-  return (
-    /* AI: konten bisa diselect, wrapper tidak */
-    <div className="ai-msg-wrap">
-      {/* Avatar — tidak bisa dikopi */}
-      <div className="ai-avatar" onCopy={blockCopy}>B</div>
+  const taRef  = useRef<HTMLTextAreaElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
-      <div className="ai-content">
-        {/* Nama & waktu — tidak bisa dikopi */}
-        <div className="ai-name-row" onCopy={blockCopy}>
-          <span className="ai-name">BYYU AI</span>
-          <span className="ai-time">{fmtTime(message.ts)}</span>
-        </div>
-
-        {/* Konten jawaban — BISA dikopi */}
-        <div className="ai-prose selectable">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              pre: ({ children }) => (
-                <pre>{children}</pre>
-              ),
-              a: ({ href, children }) => (
-                <a href={href} target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Page ──────────────────────────────────────────────
-export default function Page() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeId,      setActiveId]      = useState<string | null>(null);
-  const [input,         setInput]         = useState('');
-  const [isLoading,     setIsLoading]     = useState(false);
-  const [showAbout,     setShowAbout]     = useState(false);
-  const [sidebarOpen,   setSidebarOpen]   = useState(false);
-  const [error,         setError]         = useState<string | null>(null);
-
-  const textareaRef    = useRef<HTMLTextAreaElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const activeConv = conversations.find(c => c.id === activeId) ?? null;
+  const activeConv = convs.find(c => c.id === activeId) ?? null;
   const messages   = activeConv?.messages ?? [];
 
-  /* Auto-scroll */
+  // Auto-scroll
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
 
-  /* Auto-resize textarea */
+  // Auto-resize textarea
   useEffect(() => {
-    const el = textareaRef.current;
+    const el = taRef.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [input]);
 
-  /* Buat conversation baru */
-  const newConversation = useCallback(() => {
-    const id = uid();
-    const conv: Conversation = { id, title: 'Percakapan Baru', messages: [], ts: Date.now() };
-    setConversations(prev => [conv, ...prev]);
+  // New conversation
+  const newConv = useCallback(() => {
+    const id   = uid();
+    const conv: Conv = { id, title: 'Percakapan Baru', messages: [], ts: Date.now() };
+    setConvs(prev => [conv, ...prev]);
     setActiveId(id);
     setInput('');
     setError(null);
     setSidebarOpen(false);
-    setTimeout(() => textareaRef.current?.focus(), 100);
+    setTimeout(() => taRef.current?.focus(), 80);
   }, []);
 
-  /* Init */
-  useEffect(() => { newConversation(); }, []); // eslint-disable-line
+  useEffect(() => { newConv(); }, []); // eslint-disable-line
 
-  /* Hapus conversation */
-  const deleteConv = useCallback((id: string) => {
-    setConversations(prev => prev.filter(c => c.id !== id));
-    if (activeId === id) setTimeout(newConversation, 50);
-  }, [activeId, newConversation]);
+  // Delete conversation
+  const delConv = useCallback((id: string) => {
+    setConvs(prev => prev.filter(c => c.id !== id));
+    if (activeId === id) setTimeout(newConv, 40);
+  }, [activeId, newConv]);
 
-  /* Kirim pesan */
-  const sendMessage = useCallback(async (content: string) => {
-    const text = content.trim();
-    if (!text || isLoading) return;
+  // Send message
+  const send = useCallback(async (text: string) => {
+    const content = text.trim();
+    if (!content || loading) return;
 
     setError(null);
     setInput('');
 
+    // Ensure active conversation
     let convId = activeId;
     if (!convId) {
       const id = uid();
-      const conv: Conversation = { id, title: trunc(text, 40), messages: [], ts: Date.now() };
-      setConversations(prev => [conv, ...prev]);
+      setConvs(prev => [{ id, title: trunc(content, 40), messages: [], ts: Date.now() }, ...prev]);
       setActiveId(id);
       convId = id;
     }
 
-    const userMsg: Message = { id: uid(), role: 'user', content: text, ts: Date.now() };
+    const userMsg: Msg = { id: uid(), role: 'user', content, ts: Date.now() };
 
-    setConversations(prev =>
+    setConvs(prev =>
       prev.map(c => c.id !== convId ? c : {
         ...c,
-        title:    c.messages.length === 0 ? trunc(text, 40) : c.title,
+        title:    c.messages.length === 0 ? trunc(content, 40) : c.title,
         messages: [...c.messages, userMsg],
       })
     );
 
-    setIsLoading(true);
+    setLoading(true);
+
+    // Web search if enabled
+    let searchResults: SearchResult[] | null = null;
+    if (searchMode) {
+      setSearching(true);
+      try {
+        const r = await fetch('/api/search', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ query: content }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          searchResults = d.results ?? null;
+        }
+      } catch { /* silently ignore */ }
+      setSearching(false);
+    }
+
+    // Build history
+    const currentMsgs = [
+      ...(convs.find(c => c.id === convId)?.messages ?? []),
+      userMsg,
+    ];
 
     try {
-      const history = [
-        ...(conversations.find(c => c.id === convId)?.messages ?? []),
-        userMsg,
-      ];
-
-      const res = await fetch('/api/chat', {
+      const r = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          messages: history.map(m => ({ role: m.role, content: m.content })),
+          messages: currentMsgs.map(m => ({ role: m.role, content: m.content })),
+          proMode,
+          searchResults,
         }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error ?? `HTTP ${res.status}`);
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        throw new Error(e.error ?? `HTTP ${r.status}`);
       }
 
-      const data = await res.json();
-      const aiMsg: Message = {
-        id:      uid(),
-        role:    'assistant',
-        content: data.message ?? '',
-        ts:      Date.now(),
+      const data = await r.json();
+      const aiMsg: Msg = {
+        id:       uid(),
+        role:     'assistant',
+        content:  data.message ?? '',
+        ts:       Date.now(),
+        proMode,
+        searched: !!searchResults?.length,
       };
 
-      setConversations(prev =>
+      setConvs(prev =>
         prev.map(c => c.id !== convId ? c : {
-          ...c,
-          messages: [...c.messages, aiMsg],
+          ...c, messages: [...c.messages, aiMsg],
         })
       );
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan');
     } finally {
-      setIsLoading(false);
-      setTimeout(() => textareaRef.current?.focus(), 100);
+      setLoading(false);
+      setSearching(false);
+      setTimeout(() => taRef.current?.focus(), 80);
     }
-  }, [activeId, isLoading, conversations]);
+  }, [activeId, loading, convs, proMode, searchMode]);
 
-  const handleSubmit = (e: FormEvent) => { e.preventDefault(); sendMessage(input); };
-  const handleKey    = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
+  const onSubmit = (e: FormEvent) => { e.preventDefault(); send(input); };
+  const onKey    = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); }
   };
 
-  const isEmptyChat = messages.length === 0;
+  const isEmpty = messages.length === 0;
 
   return (
-    /* onCopy di root: blokir semua kecuali yang pakai .selectable */
-    <div className="app-container" onCopy={blockCopy}>
+    <div className="app" onCopy={blockCopy}>
 
-      {/* ── Sidebar overlay (mobile) ── */}
+      {/* Mobile overlay */}
       <div
-        className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
+        className={`mob-overlay ${sidebarOpen ? 'open' : ''}`}
         onClick={() => setSidebarOpen(false)}
       />
 
-      {/* ── Sidebar ── */}
+      {/* ── SIDEBAR ── */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <div className="logo-badge">B</div>
-            <span className="logo-text">BYYU AI</span>
+        <div className="sidebar-head">
+          <div className="logo-row">
+            <div className="logo-b">B</div>
+            <span className="logo-name">BYYU AI</span>
           </div>
-          <button className="icon-btn" onClick={newConversation} title="Chat baru">
+          <button className="icon-btn" onClick={newConv} title="Chat baru">
             <Plus size={16} />
           </button>
         </div>
 
-        <div className="sidebar-list">
-          {conversations.length === 0 ? (
-            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 24, padding: '0 16px' }}>
+        <div className="sidebar-body">
+          {convs.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', marginTop: 24, padding: '0 12px' }}>
               Belum ada percakapan
             </p>
-          ) : (
-            conversations.map(conv => (
-              <div
-                key={conv.id}
-                className={`conv-item ${activeId === conv.id ? 'active' : ''}`}
-                onClick={() => { setActiveId(conv.id); setSidebarOpen(false); }}
+          ) : convs.map(c => (
+            <div
+              key={c.id}
+              className={`conv-item ${activeId === c.id ? 'active' : ''}`}
+              onClick={() => { setActiveId(c.id); setSidebarOpen(false); }}
+            >
+              <MessageSquare size={13} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+              <span className="conv-title">{c.title}</span>
+              <button
+                className="conv-del"
+                onClick={e => { e.stopPropagation(); delConv(c.id); }}
+                title="Hapus"
               >
-                <MessageSquare size={13} style={{ flexShrink: 0, color: 'var(--muted)' }} />
-                <span className="conv-title">{conv.title}</span>
-                <button
-                  className="conv-delete"
-                  onClick={e => { e.stopPropagation(); deleteConv(conv.id); }}
-                  title="Hapus"
-                >
-                  <Trash2 size={11} />
-                </button>
-              </div>
-            ))
-          )}
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
         </div>
 
-        <div className="sidebar-footer">
+        <div className="sidebar-foot">
           <button className="about-btn" onClick={() => setShowAbout(true)}>
             <User size={14} />
             About Developer
@@ -358,27 +486,28 @@ export default function Page() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
-      <div className="main-content">
+      {/* ── MAIN ── */}
+      <div className="main">
 
         {/* Topbar */}
         <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              className="icon-btn"
-              style={{ display: 'none' }}
-              id="hamburger-btn"
-              onClick={() => setSidebarOpen(true)}
-            >
+          <div className="topbar-left">
+            <button className="icon-btn" onClick={() => setSidebarOpen(true)}
+              style={{ display: 'flex' }}>
               <Menu size={18} />
             </button>
-            <MobileHamburger onClick={() => setSidebarOpen(true)} />
             <span className="topbar-title">{activeConv?.title ?? 'BYYU AI'}</span>
           </div>
-          <button className="topbar-about-btn" onClick={() => setShowAbout(true)}>
-            <User size={13} />
-            About Developer
-          </button>
+          <div className="topbar-right">
+            <button className="theme-toggle" onClick={toggleTheme}
+              title={theme === 'light' ? 'Mode Gelap' : 'Mode Terang'}>
+              {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+            </button>
+            <button className="topbar-about" onClick={() => setShowAbout(true)}>
+              <User size={13} />
+              <span style={{ display: 'none', fontSize: 12 }}>About</span>
+            </button>
+          </div>
         </header>
 
         {/* Chat scroll */}
@@ -386,21 +515,18 @@ export default function Page() {
           <div className="chat-inner">
 
             {/* Welcome */}
-            {isEmptyChat && (
-              <div className="welcome-screen" onCopy={blockCopy}>
-                <div className="welcome-badge">B</div>
-                <h1 className="welcome-title">Halo, saya BYYU AI</h1>
+            {isEmpty && (
+              <div className="welcome" onCopy={blockCopy}>
+                <div className="welcome-icon">B</div>
+                <h1>Halo, saya BYYU AI</h1>
                 <p className="welcome-sub">
-                  Asisten cerdas yang siap membantu Anda dengan berbagai pertanyaan dan tugas.
+                  Asisten AI canggih — matematika, koding, penelitian, dan lebih.
+                  {proMode && ' ⚡ Mode Pro aktif.'}{searchMode && ' 🔍 Pencarian web aktif.'}
                 </p>
-                <div className="starters-grid">
-                  {STARTERS.map(q => (
-                    <button
-                      key={q}
-                      className="starter-btn"
-                      onClick={() => sendMessage(q)}
-                    >
-                      <span style={{ flex: 1 }}>{q}</span>
+                <div className="starters">
+                  {STARTERS.map(s => (
+                    <button key={s} className="starter" onClick={() => send(s)}>
+                      <span>{s}</span>
                       <ChevronRight size={13} className="arrow" />
                     </button>
                   ))}
@@ -410,28 +536,26 @@ export default function Page() {
 
             {/* Messages */}
             {messages.map(msg => (
-              <MessageBlock key={msg.id} message={msg} />
+              <MessageBlock key={msg.id} msg={msg} />
             ))}
 
             {/* Loading */}
-            {isLoading && (
-              <div className="loading-wrap">
-                <div className="ai-avatar">B</div>
-                <div className="ai-content">
+            {loading && (
+              <div className="status-wrap">
+                <div className="ai-avatar" onCopy={blockCopy}>B</div>
+                <div className="ai-body">
                   <div className="ai-name-row" onCopy={blockCopy}>
                     <span className="ai-name">BYYU AI</span>
                   </div>
-                  <LoadingDots />
+                  <LoadingDots proMode={proMode} searching={searching} />
                 </div>
               </div>
             )}
 
             {/* Error */}
             {error && (
-              <div className="error-wrap" onCopy={blockCopy}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#ef4444', fontSize: 13 }}>
-                  !
-                </div>
+              <div className="status-wrap" onCopy={blockCopy}>
+                <div style={{ width:33, height:33, borderRadius:'50%', background:'color-mix(in srgb, #ef4444 12%, transparent)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:'#ef4444', fontSize:13, border:'1px solid color-mix(in srgb, #ef4444 25%, transparent)' }}>!</div>
                 <div className="error-bubble">
                   <p className="error-text">{error}</p>
                   <button className="error-close" onClick={() => setError(null)}>Tutup</button>
@@ -439,30 +563,58 @@ export default function Page() {
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+            <div ref={endRef} />
           </div>
         </div>
 
-        {/* Input */}
+        {/* Input area */}
         <div className="input-area" onCopy={blockCopy}>
-          <div className="input-wrap-outer">
-            <form onSubmit={handleSubmit}>
+          <div className="input-outer">
+            <form onSubmit={onSubmit}>
               <div className="input-box">
                 <textarea
-                  ref={textareaRef}
+                  ref={taRef}
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="Kirim pesan ke BYYU AI..."
+                  onKeyDown={onKey}
+                  placeholder={
+                    proMode && searchMode ? 'Mode Pro + Web aktif — tanya apa saja...' :
+                    proMode              ? 'Mode Pro aktif — untuk soal kompleks...' :
+                    searchMode           ? 'Pencarian web aktif — tanya fakta terkini...' :
+                    'Kirim pesan ke BYYU AI...'
+                  }
                   rows={1}
-                  className="chat-textarea"
-                  disabled={isLoading}
+                  className="chat-ta"
+                  disabled={loading}
                 />
-                <div className="input-bottom">
-                  <span className="input-hint">Enter kirim · Shift+Enter baris baru</span>
+
+                <div className="input-foot">
+                  {/* Mode toggles */}
+                  <div className="modes">
+                    <button
+                      type="button"
+                      className={`mode-toggle ${proMode ? 'active pro' : ''}`}
+                      onClick={() => setProMode(p => !p)}
+                      title="Mode Pro: penalaran mendalam"
+                    >
+                      <Zap size={12} />
+                      <span>Pro</span>
+                    </button>
+                    <button
+                      type="button"
+ className={`mode-toggle ${searchMode ? 'active search' : ''}`}
+                      onClick={() => setSearchMode(p => !p)}
+                      title="Cari web untuk info terkini"
+                    >
+                      <Search size={12} />
+                      <span>Web</span>
+                    </button>
+                  </div>
+
+                  {/* Send */}
                   <button
                     type="submit"
-                    disabled={!input.trim() || isLoading}
+                    disabled={!input.trim() || loading}
                     className="send-btn"
                     aria-label="Kirim"
                   >
@@ -471,8 +623,9 @@ export default function Page() {
                 </div>
               </div>
             </form>
+
             <p className="footer-credit">
-              © 2026 BYYU AI · Built by{' '}
+              © 2026 BYYU AI ·{' '}
               <button className="footer-link" onClick={() => setShowAbout(true)}>
                 Abiyyu Rafa Ramadhan
               </button>
@@ -487,16 +640,13 @@ export default function Page() {
   );
 }
 
-/* Komponen kecil untuk hamburger mobile */
-function MobileHamburger({ onClick }: { onClick: () => void }) {
+// ══════════════════════════════════════════
+// EXPORT (with ThemeProvider wrapper)
+// ══════════════════════════════════════════
+export default function Page() {
   return (
-    <button
-      className="icon-btn"
-      onClick={onClick}
-      style={{ display: 'flex' }}
-      id="mobile-hamburger"
-    >
-      <Menu size={18} />
-    </button>
+    <ThemeProvider>
+      <ChatPage />
+    </ThemeProvider>
   );
-                  }
+}
